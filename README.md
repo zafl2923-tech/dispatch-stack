@@ -1,14 +1,14 @@
 # :truck: DispatchStack
 
 ### **North American Logistics & Regulatory Compliance Platform**
-**DispatchStack** is a full-stack Electronic Logging Device (ELD) solution architected to manage cross-border commercial transit across **Canada, the USA, and Mexico**. It features a high-performance **.NET 8** backend and a reactive **Next.js** dashboard designed to enforce the complex, location-specific **Hours of Service (HOS)** regulations of the USMCA zone.
+**DispatchStack** is a full-stack Electronic Logging Device (ELD) solution architected to manage cross-border commercial transit across **Canada, the USA, and Mexico**. It features a high-performance **.NET 10** backend and a reactive **Next.js** dashboard designed to enforce the complex, location-specific **Hours of Service (HOS)** regulations of the USMCA zone.
 
 ---
 
 ## :building_construction: System Architecture
 Built for sub-second validation and high data integrity to meet federal audit standards.
 
-* **Backend:** .NET 8 Web API (C#) using a **Strategy Pattern** for multi-jurisdictional compliance.
+* **Backend:** .NET 10 Web API (C#) using a **Strategy Pattern** for multi-jurisdictional compliance.
 * **Frontend:** Next.js 15 (TypeScript) with real-time state synchronization.
 * **Database:** PostgreSQL + EF Core (Optimized for time-series duty status logs).
 * **Geospatial:** Jurisdictional switching triggered by GPS-based boundary detection.
