@@ -10,6 +10,7 @@ interface TestTimerState {
   cycleTime: number // minutes (70-hour/8-day cycle)
   isRunning: boolean
   lastReset: Date
+  lastBreakTime: number // driving time when last 30-min break was taken
 }
 
 interface USMCAComplianceTest {
@@ -26,7 +27,8 @@ export default function TestingPage() {
     offDutyTime: 0,
     cycleTime: 0,
     isRunning: false,
-    lastReset: new Date()
+    lastReset: new Date(),
+    lastBreakTime: 0
   })
 
   const [compliance, setCompliance] = useState<USMCAComplianceTest>({
@@ -56,7 +58,7 @@ export default function TestingPage() {
           const newCompliance = {
             elevenHourRule: newDrivingTime < 660, // 11 hours = 660 minutes
             fourteenHourRule: newOnDutyTime < 840, // 14 hours = 840 minutes
-            thirtyMinuteBreak: newDrivingTime <= 480 || newDrivingTime >= 510, // 30-min break after 8 hours (480 min)
+            thirtyMinuteBreak: (newDrivingTime - prev.lastBreakTime) <= 480, // 30-min break after 8 hours since last break
             seventyHourRule: newCycleTime < 4200 // 70 hours = 4200 minutes
           }
 
@@ -92,7 +94,8 @@ export default function TestingPage() {
       offDutyTime: 0,
       cycleTime: 0,
       isRunning: false,
-      lastReset: new Date()
+      lastReset: new Date(),
+      lastBreakTime: 0
     })
   }
 
@@ -110,6 +113,10 @@ export default function TestingPage() {
           break
         case 'offDuty':
           newState.offDutyTime = Math.max(0, prev.offDutyTime + minutes)
+          // If adding 30+ minutes of off-duty time, reset break timer
+          if (minutes >= 30) {
+            newState.lastBreakTime = newState.drivingTime
+          }
           break
       }
       
@@ -119,13 +126,28 @@ export default function TestingPage() {
       const newCompliance = {
         elevenHourRule: newState.drivingTime < 660, // 11 hours = 660 minutes
         fourteenHourRule: newState.onDutyTime < 840, // 14 hours = 840 minutes
-        thirtyMinuteBreak: newState.drivingTime <= 480 || newState.drivingTime >= 510, // 30-min break after 8 hours (480 min)
+        thirtyMinuteBreak: (newState.drivingTime - newState.lastBreakTime) <= 480, // 30-min break after 8 hours since last break
         seventyHourRule: newState.cycleTime < 4200 // 70 hours = 4200 minutes
       }
       setCompliance(newCompliance)
       
       return newState
     })
+  }
+
+  const takeThirtyMinuteBreak = () => {
+    setTimer(prev => ({
+      ...prev,
+      offDutyTime: prev.offDutyTime + 30,
+      cycleTime: prev.cycleTime + 30,
+      lastBreakTime: prev.drivingTime
+    }))
+    
+    // Update compliance after taking break
+    setCompliance(prev => ({
+      ...prev,
+      thirtyMinuteBreak: true
+    }))
   }
 
   const ComplianceCard = ({ title, isCompliant, rule }: { 
@@ -207,6 +229,13 @@ export default function TestingPage() {
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Reset
+                </button>
+                <button
+                  onClick={takeThirtyMinuteBreak}
+                  className="flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Take 30-min Break
                 </button>
               </div>
             </div>
@@ -295,7 +324,8 @@ export default function TestingPage() {
                   offDutyTime: 0,
                   cycleTime: 2400, // 40 hours
                   isRunning: false,
-                  lastReset: new Date()
+                  lastReset: new Date(),
+                  lastBreakTime: 0 // No break taken yet
                 }
                 setTimer(newTimer)
                 
@@ -303,7 +333,7 @@ export default function TestingPage() {
                 const newCompliance = {
                   elevenHourRule: newTimer.drivingTime < 660,
                   fourteenHourRule: newTimer.onDutyTime < 840,
-                  thirtyMinuteBreak: newTimer.drivingTime <= 480 || newTimer.drivingTime >= 510,
+                  thirtyMinuteBreak: (newTimer.drivingTime - newTimer.lastBreakTime) <= 480,
                   seventyHourRule: newTimer.cycleTime < 4200
                 }
                 setCompliance(newCompliance)
@@ -322,7 +352,8 @@ export default function TestingPage() {
                   offDutyTime: 0,
                   cycleTime: 3000, // 50 hours
                   isRunning: false,
-                  lastReset: new Date()
+                  lastReset: new Date(),
+                  lastBreakTime: 0 // No break taken yet
                 }
                 setTimer(newTimer)
                 
@@ -330,7 +361,7 @@ export default function TestingPage() {
                 const newCompliance = {
                   elevenHourRule: newTimer.drivingTime < 660,
                   fourteenHourRule: newTimer.onDutyTime < 840,
-                  thirtyMinuteBreak: newTimer.drivingTime <= 480 || newTimer.drivingTime >= 510,
+                  thirtyMinuteBreak: (newTimer.drivingTime - newTimer.lastBreakTime) <= 480,
                   seventyHourRule: newTimer.cycleTime < 4200
                 }
                 setCompliance(newCompliance)
@@ -349,7 +380,8 @@ export default function TestingPage() {
                   offDutyTime: 480, // 8 hours
                   cycleTime: 1800, // 30 hours
                   isRunning: false,
-                  lastReset: new Date()
+                  lastReset: new Date(),
+                  lastBreakTime: 300 // Break taken after 5 hours
                 }
                 setTimer(newTimer)
                 
@@ -357,7 +389,7 @@ export default function TestingPage() {
                 const newCompliance = {
                   elevenHourRule: newTimer.drivingTime < 660,
                   fourteenHourRule: newTimer.onDutyTime < 840,
-                  thirtyMinuteBreak: newTimer.drivingTime <= 480 || newTimer.drivingTime >= 510,
+                  thirtyMinuteBreak: (newTimer.drivingTime - newTimer.lastBreakTime) <= 480,
                   seventyHourRule: newTimer.cycleTime < 4200
                 }
                 setCompliance(newCompliance)
