@@ -33,11 +33,11 @@ interface HOSState {
 }
 
 interface ComplianceStatus {
-  elevenHourRule: boolean
-  fourteenHourRule: boolean
-  thirtyMinuteBreak: boolean
-  seventyHourRule: boolean
-  journeyCompliance: boolean
+  elevenHourRule: 'compliant' | 'warning' | 'violation'
+  fourteenHourRule: 'compliant' | 'warning' | 'violation'
+  thirtyMinuteBreak: 'compliant' | 'warning' | 'violation'
+  seventyHourRule: 'compliant' | 'warning' | 'violation'
+  journeyCompliance: 'compliant' | 'warning' | 'violation'
 }
 
 export default function JourneySimulationPage() {
@@ -69,11 +69,11 @@ export default function JourneySimulationPage() {
   })
 
   const [compliance, setCompliance] = useState<ComplianceStatus>({
-    elevenHourRule: true,
-    fourteenHourRule: true,
-    thirtyMinuteBreak: true,
-    seventyHourRule: true,
-    journeyCompliance: true
+    elevenHourRule: 'compliant',
+    fourteenHourRule: 'compliant',
+    thirtyMinuteBreak: 'compliant',
+    seventyHourRule: 'compliant',
+    journeyCompliance: 'compliant'
   })
 
   const [isSimulating, setIsSimulating] = useState(false)
@@ -125,13 +125,19 @@ export default function JourneySimulationPage() {
               break
           }
 
-          // Update compliance
-          const newCompliance = {
-            elevenHourRule: newState.drivingTime < 660,
-            fourteenHourRule: newState.onDutyTime < 840,
-            thirtyMinuteBreak: (newState.drivingTime - newState.lastBreakTime) <= 480,
-            seventyHourRule: newState.cycleTime < 4200,
-            journeyCompliance: true
+          // Update compliance with warning thresholds
+          const getComplianceStatus = (current: number, limit: number, warningThreshold: number = 0.9) => {
+            if (current >= limit) return 'violation'
+            if (current >= limit * warningThreshold) return 'warning'
+            return 'compliant'
+          }
+
+          const newCompliance: ComplianceStatus = {
+            elevenHourRule: getComplianceStatus(newState.drivingTime, 660), // 11 hours = 660 minutes
+            fourteenHourRule: getComplianceStatus(newState.onDutyTime, 840), // 14 hours = 840 minutes
+            thirtyMinuteBreak: getComplianceStatus(newState.drivingTime - newState.lastBreakTime, 480), // 8 hours = 480 minutes
+            seventyHourRule: getComplianceStatus(newState.cycleTime, 4200), // 70 hours = 4200 minutes
+            journeyCompliance: 'compliant'
           }
           setCompliance(newCompliance)
 
@@ -218,21 +224,45 @@ export default function JourneySimulationPage() {
     )
   }
 
-  const ComplianceCard = ({ title, isCompliant, details }: { 
+  const ComplianceCard = ({ title, status, details }: { 
     title: string
-    isCompliant: boolean
+    status: 'compliant' | 'warning' | 'violation'
     details: string 
-  }) => (
-    <div className={`p-4 rounded-lg border-2 ${isCompliant ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
-      <div className="flex items-start space-x-3">
-        <div className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 ${isCompliant ? 'bg-green-500' : 'bg-red-500'}`}></div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-600 mt-1">{details}</p>
+  }) => {
+    const getColorClasses = () => {
+      switch (status) {
+        case 'compliant':
+          return 'border-green-500 bg-green-50'
+        case 'warning':
+          return 'border-orange-500 bg-orange-50'
+        case 'violation':
+          return 'border-red-500 bg-red-50'
+      }
+    }
+
+    const getIndicatorColor = () => {
+      switch (status) {
+        case 'compliant':
+          return 'bg-green-500'
+        case 'warning':
+          return 'bg-orange-500'
+        case 'violation':
+          return 'bg-red-500'
+      }
+    }
+
+    return (
+      <div className={`p-4 rounded-lg border-2 ${getColorClasses()}`}>
+        <div className="flex items-start space-x-3">
+          <div className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 ${getIndicatorColor()}`}></div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900">{title}</h3>
+            <p className="text-sm text-gray-600 mt-1">{details}</p>
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -529,27 +559,27 @@ export default function JourneySimulationPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <ComplianceCard
               title="11-Hour Driving Rule"
-              isCompliant={compliance.elevenHourRule}
+              status={compliance.elevenHourRule}
               details="Maximum 11 hours driving after 10 consecutive hours off-duty"
             />
             <ComplianceCard
               title="14-Hour On-Duty Rule"
-              isCompliant={compliance.fourteenHourRule}
+              status={compliance.fourteenHourRule}
               details="Maximum 14 hours on-duty after 10 consecutive hours off-duty"
             />
             <ComplianceCard
               title="30-Minute Break Rule"
-              isCompliant={compliance.thirtyMinuteBreak}
+              status={compliance.thirtyMinuteBreak}
               details="30-minute break required after 8 hours of cumulative driving"
             />
             <ComplianceCard
               title="70-Hour/8-Day Rule"
-              isCompliant={compliance.seventyHourRule}
+              status={compliance.seventyHourRule}
               details="Maximum 70 hours of driving in 8 consecutive days"
             />
             <ComplianceCard
               title="Journey Compliance"
-              isCompliant={compliance.journeyCompliance}
+              status={compliance.journeyCompliance}
               details="All journey requirements and documentation complete"
             />
           </div>
