@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Truck, Fuel, Clock, MapPin, TestTube } from 'lucide-react'
+import { Truck, Fuel, Clock, MapPin, TestTube, Compass } from 'lucide-react'
 
 interface TruckStats {
   distanceToday: number
@@ -160,6 +160,23 @@ export default function Dashboard() {
             >
               <TestTube className="h-4 w-4 mr-2" />
               Open Testing Lab
+            </a>
+          </div>
+        </div>
+
+        {/* Navigation to Journey Simulation */}
+        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Journey Simulation</h2>
+              <p className="text-gray-600 mt-1">Complete USMCA-compliant journey simulation</p>
+            </div>
+            <a
+              href="/journey-simulation"
+              className="flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
+            >
+              <Compass className="h-4 w-4 mr-2" />
+              Start Journey Simulation
             </a>
           </div>
         </div>
