@@ -23,6 +23,9 @@ interface JourneyState {
   loadWeight: number
   requiresPermit: boolean
   permitStatus?: string
+  // Real GPS tracking (no map API)
+  currentPosition?: { lat: number; lng: number; accuracy?: number; speed?: number; timestamp?: number }
+  path?: { lat: number; lng: number; timestamp?: number }[]
 }
 
 interface HOSState {
@@ -63,6 +66,9 @@ export default function JourneySimulationPage() {
     loadWeight: 0,
     requiresPermit: false,
     permitStatus: ''
+    ,
+    currentPosition: undefined,
+    path: []
   })
 
   // Regions (states/provinces/territories) mapped to popular cities. Nunavut intentionally omitted.
@@ -176,6 +182,11 @@ export default function JourneySimulationPage() {
   const originDropdownRef = useRef<HTMLDivElement | null>(null)
   const destinationDropdownRef = useRef<HTMLDivElement | null>(null)
 
+  // GPS refs/state for real tracking
+  const geoWatchIdRef = useRef<number | null>(null)
+  const lastReceivedPositionRef = useRef<GeolocationPosition | null>(null)
+  const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -284,6 +295,82 @@ export default function JourneySimulationPage() {
 
     return () => clearInterval(interval)
   }, [isSimulating, journey.status, simulationSpeed])
+
+  // Start a geolocation watch and sample the latest position once per minute
+  useEffect(() => {
+    // Only active while a journey is in-progress
+    if (journey.status !== 'in-progress') {
+      // cleanup if necessary
+      try {
+        if (geoWatchIdRef.current !== null && 'geolocation' in navigator) {
+          navigator.geolocation.clearWatch(geoWatchIdRef.current)
+          geoWatchIdRef.current = null
+        }
+      } catch (e) {
+        console.error(e)
+      }
+
+      if (gpsIntervalRef.current) {
+        clearInterval(gpsIntervalRef.current)
+        gpsIntervalRef.current = null
+      }
+
+      return
+    }
+
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      console.warn('Geolocation API not available in this environment')
+      return
+    }
+
+    const success = (pos: GeolocationPosition) => {
+      // store last received position; we will persist it on 1-minute ticks
+      lastReceivedPositionRef.current = pos
+    }
+
+    const error = (err: GeolocationPositionError) => {
+      console.error('Geolocation error', err)
+    }
+
+    const watchId = navigator.geolocation.watchPosition(success, error, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    })
+
+    // store numeric id
+    geoWatchIdRef.current = watchId as unknown as number
+
+    // Sample the last received position once per minute (business rule)
+    gpsIntervalRef.current = setInterval(() => {
+      const p = lastReceivedPositionRef.current
+      if (!p) return
+
+      const posObj = { lat: p.coords.latitude, lng: p.coords.longitude, timestamp: p.timestamp }
+      setJourney(prev => ({
+        ...prev,
+        currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: posObj.timestamp },
+        path: [...(prev.path || []), posObj]
+      }))
+    }, 60000)
+
+    // Cleanup when effect re-runs or component unmounts
+    return () => {
+      try {
+        if (geoWatchIdRef.current !== null && 'geolocation' in navigator) {
+          navigator.geolocation.clearWatch(geoWatchIdRef.current)
+          geoWatchIdRef.current = null
+        }
+      } catch (e) {
+        console.error(e)
+      }
+
+      if (gpsIntervalRef.current) {
+        clearInterval(gpsIntervalRef.current)
+        gpsIntervalRef.current = null
+      }
+    }
+  }, [journey.status])
 
   const formatTime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60)
@@ -436,6 +523,21 @@ export default function JourneySimulationPage() {
                     <option value="Mexico">Mexico</option>
                   </select>
                 </div>
+              {/* GPS tracking (device) - updates every minute */}
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">GPS Tracking</h3>
+                {journey.currentPosition ? (
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <p className="text-sm text-gray-600">Latitude: {journey.currentPosition.lat.toFixed(6)}</p>
+                    <p className="text-sm text-gray-600">Longitude: {journey.currentPosition.lng.toFixed(6)}</p>
+                    <p className="text-sm text-gray-600">Accuracy: {journey.currentPosition.accuracy ? `${journey.currentPosition.accuracy.toFixed(1)} m` : 'N/A'}</p>
+                    <p className="text-sm text-gray-600">Speed: {journey.currentPosition.speed ? `${journey.currentPosition.speed.toFixed(1)} m/s` : 'N/A'}</p>
+                    <p className="text-sm text-gray-600">Samples: {journey.path?.length || 0}</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-3 rounded-md text-sm text-gray-600">Waiting for GPS fix or permission...</div>
+                )}
+              </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Destination Country</label>
                   <select
