@@ -239,6 +239,23 @@ export default function JourneySimulationPage() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [simulationSpeed, setSimulationSpeed] = useState(1) // minutes per second
 
+  // Jurisdiction rules (minutes)
+  const jurisdictionRules: Record<string, {
+    maxDrivingMinutes: number
+    maxOnDutyMinutes: number
+    // threshold (minutes) after which a break is required, and break length (minutes)
+    breakThresholdMinutes?: number | null
+    breakLengthMinutes?: number | null
+    cycleMinutes: number
+    dailyRestMinutes: number
+  }> = {
+    'United States': { maxDrivingMinutes: 11 * 60, maxOnDutyMinutes: 14 * 60, breakThresholdMinutes: 8 * 60, breakLengthMinutes: 30, cycleMinutes: 70 * 60, dailyRestMinutes: 10 * 60 },
+    'Canada': { maxDrivingMinutes: 13 * 60, maxOnDutyMinutes: 14 * 60, breakThresholdMinutes: null, breakLengthMinutes: null, cycleMinutes: 70 * 60, dailyRestMinutes: 10 * 60 },
+    'Mexico': { maxDrivingMinutes: 14 * 60, maxOnDutyMinutes: 14 * 60, breakThresholdMinutes: 5 * 60, breakLengthMinutes: 30, cycleMinutes: 70 * 60, dailyRestMinutes: 8 * 60 }
+  }
+
+  const [activeRules, setActiveRules] = useState(() => jurisdictionRules[journey.originCountry] || jurisdictionRules['United States'])
+
   useEffect(() => {
     let interval: NodeJS.Timeout
 
@@ -246,7 +263,7 @@ export default function JourneySimulationPage() {
       interval = setInterval(() => {
         setHos(prev => {
           const newState = { ...prev }
-          
+
           switch (prev.currentActivity) {
             case 'driving':
               newState.drivingTime += simulationSpeed
@@ -262,7 +279,7 @@ export default function JourneySimulationPage() {
             case 'off-duty':
               newState.offDutyTime += simulationSpeed
               newState.consecutiveOffDutyTime += simulationSpeed
-              // Check for 34-hour restart after 10+ consecutive hours off-duty (600 minutes)
+              // Check for restart after 10+ consecutive hours off-duty (600 minutes)
               if (newState.consecutiveOffDutyTime >= 600) {
                 newState.lastRestartTime = newState.consecutiveOffDutyTime
                 newState.drivingTime = 0
@@ -274,7 +291,6 @@ export default function JourneySimulationPage() {
             case 'sleeper':
               newState.offDutyTime += simulationSpeed
               newState.consecutiveOffDutyTime += simulationSpeed
-              // Check for 34-hour restart after 10+ consecutive hours in sleeper (600 minutes)
               if (newState.consecutiveOffDutyTime >= 600) {
                 newState.lastRestartTime = newState.consecutiveOffDutyTime
                 newState.drivingTime = 0
@@ -285,18 +301,19 @@ export default function JourneySimulationPage() {
               break
           }
 
-          // Update compliance with warning thresholds
+          // Update compliance using active jurisdiction rules
           const getComplianceStatus = (current: number, limit: number, warningThreshold: number = 0.9) => {
+            if (limit === null || limit === undefined) return 'compliant'
             if (current >= limit) return 'violation'
             if (current >= limit * warningThreshold) return 'warning'
             return 'compliant'
           }
 
           const newCompliance: ComplianceStatus = {
-            elevenHourRule: getComplianceStatus(newState.drivingTime, 660), // 11 hours = 660 minutes
-            fourteenHourRule: getComplianceStatus(newState.onDutyTime, 840), // 14 hours = 840 minutes
-            thirtyMinuteBreak: getComplianceStatus(newState.drivingTime - newState.lastBreakTime, 480), // 8 hours = 480 minutes
-            seventyHourRule: getComplianceStatus(newState.cycleTime, 4200), // 70 hours = 4200 minutes
+            elevenHourRule: getComplianceStatus(newState.drivingTime, activeRules.maxDrivingMinutes),
+            fourteenHourRule: getComplianceStatus(newState.onDutyTime, activeRules.maxOnDutyMinutes),
+            thirtyMinuteBreak: getComplianceStatus(newState.drivingTime - newState.lastBreakTime, activeRules.breakThresholdMinutes ?? Infinity),
+            seventyHourRule: getComplianceStatus(newState.cycleTime, activeRules.cycleMinutes),
             journeyCompliance: 'compliant'
           }
           setCompliance(newCompliance)
@@ -307,7 +324,7 @@ export default function JourneySimulationPage() {
     }
 
     return () => clearInterval(interval)
-  }, [isSimulating, journey.status, simulationSpeed])
+  }, [isSimulating, journey.status, simulationSpeed, activeRules])
 
   // Start a geolocation watch and sample the latest position once per minute
   useEffect(() => {
@@ -413,6 +430,14 @@ export default function JourneySimulationPage() {
       setBorderAlert(null)
     }
   }, [journey.status])
+
+  // Update active jurisdiction rules when current country changes
+  useEffect(() => {
+    const country = journey.currentCountry || journey.originCountry
+    if (country && jurisdictionRules[country]) {
+      setActiveRules(jurisdictionRules[country])
+    }
+  }, [journey.currentCountry, journey.originCountry])
 
   const formatTime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60)
@@ -573,7 +598,11 @@ export default function JourneySimulationPage() {
                   <label className="block text-sm font-medium text-gray-700">Origin Country</label>
                   <select
                     value={journey.originCountry}
-                    onChange={(e) => setJourney(prev => ({ ...prev, originCountry: e.target.value, originRegion: '', originCity: '' }))}
+                    onChange={(e) => {
+                      const country = e.target.value
+                      setJourney(prev => ({ ...prev, originCountry: country, originRegion: '', originCity: '' }))
+                      if (jurisdictionRules[country]) setActiveRules(jurisdictionRules[country])
+                    }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
                     disabled={journey.status !== 'planned'}
                   >
@@ -934,27 +963,34 @@ export default function JourneySimulationPage() {
             <CheckCircle className="h-5 w-5 mr-2" />
             USMCA Compliance Status
           </h2>
-          
+
+          {/* Active jurisdiction summary */}
+          <div className="mb-4">
+            <p className="text-sm text-gray-700">Active Jurisdiction: <strong>{journey.currentCountry || journey.originCountry}</strong></p>
+            <p className="text-sm text-gray-600 mt-1">Driving limit: <strong>{formatTime(activeRules.maxDrivingMinutes)}</strong> — On-duty limit: <strong>{formatTime(activeRules.maxOnDutyMinutes)}</strong> — Cycle: <strong>{formatTime(activeRules.cycleMinutes)}</strong></p>
+            <p className="text-sm text-gray-600">{activeRules.breakThresholdMinutes ? `Requires ${activeRules.breakLengthMinutes}m break after ${formatTime(activeRules.breakThresholdMinutes)} driving` : 'No mandated in-route break threshold'}</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <ComplianceCard
-              title="11-Hour Driving Rule"
+              title={`${Math.round(activeRules.maxDrivingMinutes / 60)}-Hour Driving Rule`}
               status={compliance.elevenHourRule}
-              details="Maximum 11 hours driving after 10 consecutive hours off-duty"
+              details={`Maximum ${formatTime(activeRules.maxDrivingMinutes)} driving`}
             />
             <ComplianceCard
-              title="14-Hour On-Duty Rule"
+              title={`${Math.round(activeRules.maxOnDutyMinutes / 60)}-Hour On-Duty Rule`}
               status={compliance.fourteenHourRule}
-              details="Maximum 14 hours on-duty after 10 consecutive hours off-duty"
+              details={`Maximum ${formatTime(activeRules.maxOnDutyMinutes)} on-duty`}
             />
             <ComplianceCard
-              title="30-Minute Break Rule"
+              title={activeRules.breakThresholdMinutes ? `${activeRules.breakLengthMinutes}-Minute Break Rule` : 'Break Rule'}
               status={compliance.thirtyMinuteBreak}
-              details="30-minute break required after 8 hours of cumulative driving"
+              details={activeRules.breakThresholdMinutes ? `${activeRules.breakLengthMinutes}-minute break required after ${formatTime(activeRules.breakThresholdMinutes)} driving` : 'No mandated in-route break threshold for this jurisdiction'}
             />
             <ComplianceCard
-              title="70-Hour/8-Day Rule"
+              title={`${Math.round(activeRules.cycleMinutes / 60)}-Hour Cycle Rule`}
               status={compliance.seventyHourRule}
-              details="Maximum 70 hours of driving in 8 consecutive days"
+              details={`Maximum ${formatTime(activeRules.cycleMinutes)} of driving in cycle`}
             />
             <ComplianceCard
               title="Journey Compliance"
