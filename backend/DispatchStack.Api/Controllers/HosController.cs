@@ -17,8 +17,26 @@ namespace DispatchStack.Api.Controllers
         [HttpGet("rules/{country}")]
         public ActionResult<RulesDto> GetRules(string country)
         {
-            if (_rules.TryGetValue(country, out var r)) return Ok(r);
-            return NotFound();
+            Console.WriteLine($"[HosController] GetRules called with country: '{country}'");
+            Console.WriteLine($"[HosController] Available keys: {string.Join(", ", _rules.Keys)}");
+
+            // Try exact match first
+            if (_rules.TryGetValue(country, out var r)) 
+            {
+                Console.WriteLine($"[HosController] Found exact match for '{country}'");
+                return Ok(r);
+            }
+
+            // Try case-insensitive match
+            var key = _rules.Keys.FirstOrDefault(k => k.Equals(country, StringComparison.OrdinalIgnoreCase));
+            if (key != null)
+            {
+                Console.WriteLine($"[HosController] Found case-insensitive match: '{key}' for '{country}'");
+                return Ok(_rules[key]);
+            }
+
+            Console.WriteLine($"[HosController] No match found for '{country}'");
+            return NotFound(new { error = $"Country '{country}' not found", availableCountries = _rules.Keys });
         }
 
         [HttpPost("evaluate")]

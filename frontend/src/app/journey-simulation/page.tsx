@@ -245,12 +245,18 @@ export default function JourneySimulationPage() {
 
   const normalizeRules = (r: any) => {
     if (!r) return defaultRules
+
+    // For nullable fields (break rules), check if property exists rather than using ??
+    // This preserves null values for countries like Canada that don't have break requirements
+    const hasBreakThreshold = 'breakThresholdMinutes' in r || 'BreakThresholdMinutes' in r
+    const hasBreakLength = 'breakLengthMinutes' in r || 'BreakLengthMinutes' in r
+
     return {
       country: r.country ?? r.Country ?? defaultRules.country,
       maxDrivingMinutes: r.maxDrivingMinutes ?? r.MaxDrivingMinutes ?? defaultRules.maxDrivingMinutes,
       maxOnDutyMinutes: r.maxOnDutyMinutes ?? r.MaxOnDutyMinutes ?? defaultRules.maxOnDutyMinutes,
-      breakThresholdMinutes: r.breakThresholdMinutes ?? r.BreakThresholdMinutes ?? defaultRules.breakThresholdMinutes,
-      breakLengthMinutes: r.breakLengthMinutes ?? r.BreakLengthMinutes ?? defaultRules.breakLengthMinutes,
+      breakThresholdMinutes: hasBreakThreshold ? (r.breakThresholdMinutes ?? r.BreakThresholdMinutes) : defaultRules.breakThresholdMinutes,
+      breakLengthMinutes: hasBreakLength ? (r.breakLengthMinutes ?? r.BreakLengthMinutes) : defaultRules.breakLengthMinutes,
       cycleMinutes: r.cycleMinutes ?? r.CycleMinutes ?? defaultRules.cycleMinutes,
       dailyRestMinutes: r.dailyRestMinutes ?? r.DailyRestMinutes ?? defaultRules.dailyRestMinutes
     }
@@ -298,13 +304,22 @@ export default function JourneySimulationPage() {
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE || ''
       const url = `${apiBase}/api/hos/rules/${encodeURIComponent(country)}`
-      console.debug('fetchRules request to', url)
+      console.log('fetchRules NEXT_PUBLIC_API_BASE:', process.env.NEXT_PUBLIC_API_BASE)
+      console.log('fetchRules constructed URL:', url)
+      console.log('fetchRules country:', country)
       const res = await fetch(url)
-      if (!res.ok) return null
+      console.log('fetchRules response status:', res.status, res.statusText)
+      if (!res.ok) {
+        console.warn('fetchRules failed with status', res.status)
+        const errorText = await res.text()
+        console.warn('fetchRules error body:', errorText)
+        return null
+      }
       const data = await res.json()
+      console.debug('fetchRules response', data)
       return data
     } catch (e) {
-      console.error(e)
+      console.error('fetchRules error', e)
       return null
     }
   }
@@ -500,13 +515,33 @@ export default function JourneySimulationPage() {
     return () => { mounted = false }
   }, [journey.currentCountry, journey.originCountry])
 
-  // Evaluate HOS via backend whenever HOS state or active jurisdiction changes
+  // Local fallback compliance calculation (used when backend is unavailable)
+  const calculateComplianceLocally = (hosState: HOSState, rules: any): ComplianceStatus => {
+    const getStatus = (current: number, limit: number | null | undefined): 'compliant' | 'warning' | 'violation' => {
+      if (limit === null || limit === undefined) return 'compliant'
+      if (current >= limit) return 'violation'
+      if (current >= limit * 0.9) return 'warning'
+      return 'compliant'
+    }
+
+    return {
+      elevenHourRule: getStatus(hosState.drivingTime, rules.maxDrivingMinutes),
+      fourteenHourRule: getStatus(hosState.onDutyTime, rules.maxOnDutyMinutes),
+      thirtyMinuteBreak: getStatus(hosState.drivingTime - hosState.lastBreakTime, rules.breakThresholdMinutes),
+      seventyHourRule: getStatus(hosState.cycleTime, rules.cycleMinutes),
+      journeyCompliance: 'compliant'
+    }
+  }
+
+  // Evaluate HOS compliance whenever HOS state changes (don't update activeRules here, just compliance)
   useEffect(() => {
     let mounted = true
     ;(async () => {
       const resp = await evaluateHos(hos, journey.originCountry, journey.currentCountry)
-      if (!mounted || !resp) return
-      if (resp.compliance) {
+      if (!mounted) return
+
+      if (resp && resp.compliance) {
+        // Use backend response for compliance only
         setCompliance({
           elevenHourRule: resp.compliance.elevenHourRule || resp.compliance.ElevenHourRule || 'compliant',
           fourteenHourRule: resp.compliance.fourteenHourRule || resp.compliance.FourteenHourRule || 'compliant',
@@ -514,14 +549,16 @@ export default function JourneySimulationPage() {
           seventyHourRule: resp.compliance.seventyHourRule || resp.compliance.SeventyHourRule || 'compliant',
           journeyCompliance: resp.compliance.journeyCompliance || resp.compliance.JourneyCompliance || 'compliant'
         })
-      }
-      if (resp.activeRules) {
-        setActiveRules(normalizeRules(resp.activeRules))
+      } else {
+        // Backend unavailable - use local fallback
+        console.debug('Backend unavailable, using local compliance calculation')
+        const localCompliance = calculateComplianceLocally(hos, activeRules)
+        setCompliance(localCompliance)
       }
     })()
 
     return () => { mounted = false }
-  }, [hos, journey.currentCountry, journey.originCountry])
+  }, [hos, activeRules])
 
   const formatTime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60)
