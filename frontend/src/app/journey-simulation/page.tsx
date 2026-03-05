@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Truck, MapPin, Clock, Fuel, Play, Pause, Square, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface JourneyState {
   id: string
   origin: string
+  originRegion?: string
+  originCity?: string
   destination: string
+  destinationRegion?: string
+  destinationCity?: string
   originCountry: string
   destinationCountry: string
   distance: number
@@ -44,7 +48,11 @@ export default function JourneySimulationPage() {
   const [journey, setJourney] = useState<JourneyState>({
     id: '',
     origin: '',
+    originRegion: '',
+    originCity: '',
     destination: '',
+    destinationRegion: '',
+    destinationCity: '',
     originCountry: 'United States',
     destinationCountry: 'Canada',
     distance: 0,
@@ -56,6 +64,134 @@ export default function JourneySimulationPage() {
     requiresPermit: false,
     permitStatus: ''
   })
+
+  // Regions (states/provinces/territories) mapped to popular cities. Nunavut intentionally omitted.
+  const regionsByCountry: Record<string, Record<string, string[]>> = {
+    'United States': {
+      'Alabama': ['Birmingham', 'Montgomery', 'Mobile'],
+      'Alaska': ['Anchorage', 'Fairbanks', 'Juneau'],
+      'Arizona': ['Phoenix', 'Tucson', 'Mesa'],
+      'Arkansas': ['Little Rock', 'Fayetteville', 'Fort Smith'],
+      'California': ['Los Angeles', 'San Francisco', 'San Diego'],
+      'Colorado': ['Denver', 'Colorado Springs', 'Aurora'],
+      'Connecticut': ['Bridgeport', 'New Haven', 'Hartford'],
+      'Delaware': ['Wilmington', 'Dover', 'Newark'],
+      'Florida': ['Miami', 'Orlando', 'Tampa'],
+      'Georgia': ['Atlanta', 'Savannah', 'Augusta'],
+      'Hawaii': ['Honolulu', 'Hilo', 'Kailua'],
+      'Idaho': ['Boise', 'Idaho Falls', 'Coeur d\'Alene'],
+      'Illinois': ['Chicago', 'Springfield', 'Naperville'],
+      'Indiana': ['Indianapolis', 'Fort Wayne', 'Evansville'],
+      'Iowa': ['Des Moines', 'Cedar Rapids', 'Davenport'],
+      'Kansas': ['Wichita', 'Topeka', 'Overland Park'],
+      'Kentucky': ['Louisville', 'Lexington', 'Bowling Green'],
+      'Louisiana': ['New Orleans', 'Baton Rouge', 'Shreveport'],
+      'Maine': ['Portland', 'Augusta', 'Bangor'],
+      'Maryland': ['Baltimore', 'Annapolis', 'Frederick'],
+      'Massachusetts': ['Boston', 'Worcester', 'Springfield'],
+      'Michigan': ['Detroit', 'Grand Rapids', 'Lansing'],
+      'Minnesota': ['Minneapolis', 'St. Paul', 'Rochester'],
+      'Mississippi': ['Jackson', 'Gulfport', 'Hattiesburg'],
+      'Missouri': ['Kansas City', 'St. Louis', 'Springfield'],
+      'Montana': ['Billings', 'Missoula', 'Bozeman'],
+      'Nebraska': ['Omaha', 'Lincoln', 'Bellevue'],
+      'Nevada': ['Las Vegas', 'Reno', 'Henderson'],
+      'New Hampshire': ['Manchester', 'Concord', 'Nashua'],
+      'New Jersey': ['Newark', 'Jersey City', 'Atlantic City'],
+      'New Mexico': ['Albuquerque', 'Santa Fe', 'Las Cruces'],
+      'New York': ['New York City', 'Buffalo', 'Rochester'],
+      'North Carolina': ['Charlotte', 'Raleigh', 'Greensboro'],
+      'North Dakota': ['Fargo', 'Bismarck', 'Grand Forks'],
+      'Ohio': ['Columbus', 'Cleveland', 'Cincinnati'],
+      'Oklahoma': ['Oklahoma City', 'Tulsa', 'Norman'],
+      'Oregon': ['Portland', 'Eugene', 'Salem'],
+      'Pennsylvania': ['Philadelphia', 'Pittsburgh', 'Harrisburg'],
+      'Rhode Island': ['Providence', 'Newport', 'Warwick'],
+      'South Carolina': ['Charleston', 'Columbia', 'Greenville'],
+      'South Dakota': ['Sioux Falls', 'Rapid City', 'Aberdeen'],
+      'Tennessee': ['Nashville', 'Memphis', 'Knoxville'],
+      'Texas': ['Houston', 'Dallas', 'San Antonio'],
+      'Utah': ['Salt Lake City', 'Provo', 'Ogden'],
+      'Vermont': ['Burlington', 'Montpelier', 'Rutland'],
+      'Virginia': ['Virginia Beach', 'Richmond', 'Norfolk'],
+      'Washington': ['Seattle', 'Spokane', 'Tacoma'],
+      'West Virginia': ['Charleston', 'Morgantown', 'Huntington'],
+      'Wisconsin': ['Milwaukee', 'Madison', 'Green Bay'],
+      'Wyoming': ['Cheyenne', 'Casper', 'Laramie'],
+      'District of Columbia': ['Washington']
+    },
+    'Canada': {
+      'Ontario': ['Toronto', 'Ottawa', 'London'],
+      'Quebec': ['Montreal', 'Quebec City', 'Laval'],
+      'Nova Scotia': ['Halifax', 'Sydney', 'Truro'],
+      'New Brunswick': ['Fredericton', 'Moncton', 'Saint John'],
+      'Manitoba': ['Winnipeg', 'Brandon', 'Thompson'],
+      'British Columbia': ['Vancouver', 'Victoria', 'Kelowna'],
+      'Prince Edward Island': ['Charlottetown', 'Summerside', 'Cornwall'],
+      'Saskatchewan': ['Saskatoon', 'Regina', 'Prince Albert'],
+      'Alberta': ['Calgary', 'Edmonton', 'Red Deer'],
+      'Newfoundland and Labrador': ['St. John\'s', 'Corner Brook', 'Gander'],
+      'Yukon': ['Whitehorse', 'Dawson City', 'Watson Lake'],
+      'Northwest Territories': ['Yellowknife', 'Hay River', 'Inuvik']
+    },
+    'Mexico': {
+      'Aguascalientes': ['Aguascalientes', 'Jesús María', 'Rincón de Romos'],
+      'Baja California': ['Tijuana', 'Mexicali', 'Ensenada'],
+      'Baja California Sur': ['La Paz', 'Cabo San Lucas', 'San José del Cabo'],
+      'Campeche': ['Campeche', 'Ciudad del Carmen', 'Champotón'],
+      'Chiapas': ['Tuxtla Gutiérrez', 'San Cristóbal de las Casas', 'Tapachula'],
+      'Chihuahua': ['Chihuahua', 'Ciudad Juárez', 'Delicias'],
+      'Coahuila': ['Saltillo', 'Torreón', 'Monclova'],
+      'Colima': ['Colima', 'Manzanillo', 'Tecomán'],
+      'Durango': ['Durango', 'Gómez Palacio', 'Lerdo'],
+      'Guanajuato': ['Guanajuato', 'León', 'Irapuato'],
+      'Guerrero': ['Acapulco', 'Chilpancingo', 'Iguala'],
+      'Hidalgo': ['Pachuca', 'Tulancingo', 'Tizayuca'],
+      'Jalisco': ['Guadalajara', 'Puerto Vallarta', 'Zapopan'],
+      'México State': ['Toluca', 'Ecatepec', 'Naucalpan'],
+      'Michoacán': ['Morelia', 'Uruapan', 'Lázaro Cárdenas'],
+      'Morelos': ['Cuernavaca', 'Jiutepec', 'Cuautla'],
+      'Nayarit': ['Tepic', 'Bahía de Banderas', 'Compostela'],
+      'Nuevo León': ['Monterrey', 'San Nicolás', 'Guadalupe'],
+      'Oaxaca': ['Oaxaca City', 'Salina Cruz', 'Juchitán'],
+      'Puebla': ['Puebla City', 'Tehuacán', 'Atlixco'],
+      'Querétaro': ['Querétaro City', 'Santiago de Querétaro', 'San Juan del Río'],
+      'Quintana Roo': ['Cancún', 'Chetumal', 'Playa del Carmen'],
+      'San Luis Potosí': ['San Luis Potosí', 'Ciudad Valles', 'Matehuala'],
+      'Sinaloa': ['Culiacán', 'Mazatlán', 'Los Mochis'],
+      'Sonora': ['Hermosillo', 'Ciudad Obregón', 'Nogales'],
+      'Tabasco': ['Villahermosa', 'Cárdenas', 'Comalcalco'],
+      'Tamaulipas': ['Victoria', 'Reynosa', 'Matamoros'],
+      'Tlaxcala': ['Tlaxcala City', 'Apizaco', 'Chiautempan'],
+      'Veracruz': ['Veracruz', 'Xalapa', 'Cordoba'],
+      'Yucatán': ['Mérida', 'Valladolid', 'Progreso'],
+      'Zacatecas': ['Zacatecas', 'Fresnillo', 'Guadalupe'],
+      'Ciudad de México': ['Mexico City']
+    }
+  }
+
+  const [originCityQuery, setOriginCityQuery] = useState('')
+  const [destinationCityQuery, setDestinationCityQuery] = useState('')
+
+  const originDropdownRef = useRef<HTMLDivElement | null>(null)
+  const destinationDropdownRef = useRef<HTMLDivElement | null>(null)
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (originDropdownRef.current && !originDropdownRef.current.contains(target)) {
+        // only clear query if it's not equal to selected city (keeping selected city visible in input)
+        if (originCityQuery !== (journey.originCity || '')) setOriginCityQuery('')
+      }
+      if (destinationDropdownRef.current && !destinationDropdownRef.current.contains(target)) {
+        if (destinationCityQuery !== (journey.destinationCity || '')) setDestinationCityQuery('')
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [originCityQuery, destinationCityQuery, journey.originCity, journey.destinationCity])
 
   const [hos, setHos] = useState<HOSState>({
     drivingTime: 0,
@@ -156,13 +292,16 @@ export default function JourneySimulationPage() {
   }
 
   const startJourney = () => {
-    if (!journey.origin || !journey.destination || journey.distance <= 0) {
-      alert('Please fill in journey details first')
+    // require selected origin/destination cities and distance
+    if (!journey.originCity || !journey.destinationCity || journey.distance <= 0) {
+      alert('Please select origin and destination cities and set distance')
       return
     }
 
     const newJourney = {
       ...journey,
+      origin: journey.originCity,
+      destination: journey.destinationCity,
       id: `J-${Date.now()}`,
       status: 'in-progress' as const,
       startTime: new Date(),
@@ -281,37 +420,14 @@ export default function JourneySimulationPage() {
             </h2>
             
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Origin</label>
-                  <input
-                    type="text"
-                    value={journey.origin}
-                    onChange={(e) => setJourney(prev => ({ ...prev, origin: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
-                    placeholder="City, State"
-                    disabled={journey.status !== 'planned'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Destination</label>
-                  <input
-                    type="text"
-                    value={journey.destination}
-                    onChange={(e) => setJourney(prev => ({ ...prev, destination: e.target.value }))}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
-                    placeholder="City, State"
-                    disabled={journey.status !== 'planned'}
-                  />
-                </div>
-              </div>
+              
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Origin Country</label>
                   <select
                     value={journey.originCountry}
-                    onChange={(e) => setJourney(prev => ({ ...prev, originCountry: e.target.value }))}
+                    onChange={(e) => setJourney(prev => ({ ...prev, originCountry: e.target.value, originRegion: '', originCity: '' }))}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
                     disabled={journey.status !== 'planned'}
                   >
@@ -324,7 +440,7 @@ export default function JourneySimulationPage() {
                   <label className="block text-sm font-medium text-gray-700">Destination Country</label>
                   <select
                     value={journey.destinationCountry}
-                    onChange={(e) => setJourney(prev => ({ ...prev, destinationCountry: e.target.value }))}
+                    onChange={(e) => setJourney(prev => ({ ...prev, destinationCountry: e.target.value, destinationRegion: '', destinationCity: '' }))}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
                     disabled={journey.status !== 'planned'}
                   >
@@ -332,6 +448,94 @@ export default function JourneySimulationPage() {
                     <option value="Canada">Canada</option>
                     <option value="Mexico">Mexico</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Origin Region</label>
+                  <select
+                    value={journey.originRegion}
+                    onChange={(e) => { setJourney(prev => ({ ...prev, originRegion: e.target.value, originCity: '' })); setOriginCityQuery('') }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
+                    disabled={journey.status !== 'planned'}
+                  >
+                    <option value="">Select region</option>
+                    {(Object.keys(regionsByCountry[journey.originCountry] || {})).map(region => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
+                  </select>
+
+                  <label className="block text-sm font-medium text-gray-700 mt-3">Origin City (search)</label>
+                    <div className="relative" ref={originDropdownRef}>
+                    <input
+                      type="text"
+                      value={originCityQuery || journey.originCity || ''}
+                      onChange={(e) => { setOriginCityQuery(e.target.value); setJourney(prev => ({ ...prev, originCity: '' })) }}
+                      placeholder="Search city..."
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900 placeholder-gray-400"
+                      disabled={journey.status !== 'planned' || !journey.originRegion}
+                    />
+                    {journey.originRegion && originCityQuery.length > 0 && originCityQuery !== (journey.originCity || '') && (
+                      <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md max-h-48 overflow-auto text-gray-900">
+                        {(regionsByCountry[journey.originCountry]?.[journey.originRegion] || [])
+                          .filter(c => c.toLowerCase().includes(originCityQuery.toLowerCase()))
+                          .slice(0, 20)
+                          .map(city => (
+                            <li
+                              key={city}
+                              onClick={() => { setJourney(prev => ({ ...prev, originCity: city })); setOriginCityQuery(city) }}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-gray-900"
+                            >
+                              {city}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Destination Region</label>
+                  <select
+                    value={journey.destinationRegion}
+                    onChange={(e) => { setJourney(prev => ({ ...prev, destinationRegion: e.target.value, destinationCity: '' })); setDestinationCityQuery('') }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
+                    disabled={journey.status !== 'planned'}
+                  >
+                    <option value="">Select region</option>
+                    {(Object.keys(regionsByCountry[journey.destinationCountry] || {})).map(region => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
+                  </select>
+
+                  <label className="block text-sm font-medium text-gray-700 mt-3">Destination City (search)</label>
+                    <div className="relative" ref={destinationDropdownRef}>
+                    <input
+                      type="text"
+                      value={destinationCityQuery || journey.destinationCity || ''}
+                      onChange={(e) => { setDestinationCityQuery(e.target.value); setJourney(prev => ({ ...prev, destinationCity: '' })) }}
+                      placeholder="Search city..."
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900 placeholder-gray-400"
+                      disabled={journey.status !== 'planned' || !journey.destinationRegion}
+                    />
+                    {journey.destinationRegion && destinationCityQuery.length > 0 && destinationCityQuery !== (journey.destinationCity || '') && (
+                      <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md max-h-48 overflow-auto text-gray-900">
+                        {(regionsByCountry[journey.destinationCountry]?.[journey.destinationRegion] || [])
+                          .filter(c => c.toLowerCase().includes(destinationCityQuery.toLowerCase()))
+                          .slice(0, 20)
+                          .map(city => (
+                            <li
+                              key={city}
+                              onClick={() => { setJourney(prev => ({ ...prev, destinationCity: city })); setDestinationCityQuery(city) }}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-gray-900"
+                            >
+                              {city}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
 
