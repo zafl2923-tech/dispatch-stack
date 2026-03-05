@@ -189,16 +189,7 @@ export default function JourneySimulationPage() {
   const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [borderAlert, setBorderAlert] = useState<string | null>(null)
 
-  // Rough country bounding boxes for detection (US / Canada / Mexico)
-  const getCountryFromCoords = (lat: number, lng: number): string => {
-    // Canada bbox (approx)
-    if (lat >= 42 && lat <= 83 && lng >= -141 && lng <= -52) return 'Canada'
-    // United States bbox (approx, excludes territories)
-    if (lat >= 24.5 && lat <= 49.5 && lng >= -125 && lng <= -66) return 'United States'
-    // Mexico bbox (approx)
-    if (lat >= 14.5 && lat <= 32.7 && lng >= -118.5 && lng <= -86.7) return 'Mexico'
-    return 'Unknown'
-  }
+  // Country detection moved to backend via detectCountry
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -239,22 +230,103 @@ export default function JourneySimulationPage() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [simulationSpeed, setSimulationSpeed] = useState(1) // minutes per second
 
-  // Jurisdiction rules (minutes)
-  const jurisdictionRules: Record<string, {
-    maxDrivingMinutes: number
-    maxOnDutyMinutes: number
-    // threshold (minutes) after which a break is required, and break length (minutes)
-    breakThresholdMinutes?: number | null
-    breakLengthMinutes?: number | null
-    cycleMinutes: number
-    dailyRestMinutes: number
-  }> = {
-    'United States': { maxDrivingMinutes: 11 * 60, maxOnDutyMinutes: 14 * 60, breakThresholdMinutes: 8 * 60, breakLengthMinutes: 30, cycleMinutes: 70 * 60, dailyRestMinutes: 10 * 60 },
-    'Canada': { maxDrivingMinutes: 13 * 60, maxOnDutyMinutes: 14 * 60, breakThresholdMinutes: null, breakLengthMinutes: null, cycleMinutes: 70 * 60, dailyRestMinutes: 10 * 60 },
-    'Mexico': { maxDrivingMinutes: 14 * 60, maxOnDutyMinutes: 14 * 60, breakThresholdMinutes: 5 * 60, breakLengthMinutes: 30, cycleMinutes: 70 * 60, dailyRestMinutes: 8 * 60 }
+  // Active rules come from backend service
+  const defaultRules = {
+    country: 'United States',
+    maxDrivingMinutes: 11 * 60,
+    maxOnDutyMinutes: 14 * 60,
+    breakThresholdMinutes: 8 * 60,
+    breakLengthMinutes: 30,
+    cycleMinutes: 70 * 60,
+    dailyRestMinutes: 10 * 60
   }
 
-  const [activeRules, setActiveRules] = useState(() => jurisdictionRules[journey.originCountry] || jurisdictionRules['United States'])
+  const [activeRules, setActiveRules] = useState<any>(defaultRules)
+
+  const normalizeRules = (r: any) => {
+    if (!r) return defaultRules
+    return {
+      country: r.country ?? r.Country ?? defaultRules.country,
+      maxDrivingMinutes: r.maxDrivingMinutes ?? r.MaxDrivingMinutes ?? defaultRules.maxDrivingMinutes,
+      maxOnDutyMinutes: r.maxOnDutyMinutes ?? r.MaxOnDutyMinutes ?? defaultRules.maxOnDutyMinutes,
+      breakThresholdMinutes: r.breakThresholdMinutes ?? r.BreakThresholdMinutes ?? defaultRules.breakThresholdMinutes,
+      breakLengthMinutes: r.breakLengthMinutes ?? r.BreakLengthMinutes ?? defaultRules.breakLengthMinutes,
+      cycleMinutes: r.cycleMinutes ?? r.CycleMinutes ?? defaultRules.cycleMinutes,
+      dailyRestMinutes: r.dailyRestMinutes ?? r.DailyRestMinutes ?? defaultRules.dailyRestMinutes
+    }
+  }
+
+  // Backend API helpers
+  // Local fallback for country detection (same bbox logic used on backend)
+  const getCountryFromCoords = (lat: number, lng: number): string => {
+    // Canada bbox (approx)
+    if (lat >= 42 && lat <= 83 && lng >= -141 && lng <= -52) return 'Canada'
+    // United States bbox (approx, includes Alaska by longitude)
+    if ((lat >= 24.5 && lat <= 49.5 && lng >= -125 && lng <= -66) || (lat >= 51 && lat <= 72 && lng >= -170 && lng <= -129)) return 'United States'
+    // Mexico bbox (approx)
+    if (lat >= 14.5 && lat <= 32.7 && lng >= -118.5 && lng <= -86.7) return 'Mexico'
+    return 'Unknown'
+  }
+
+  const detectCountry = async (lat: number, lng: number) => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || ''
+      const url = `${apiBase}/api/geo/detect-country`
+      console.debug('detectCountry request to', url, { lat, lng })
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng })
+      })
+      if (!res.ok) {
+        // fallback to local bbox
+        console.debug('detectCountry backend returned not ok', res.status)
+        return getCountryFromCoords(lat, lng)
+      }
+      const data = await res.json()
+      const country = data.country || data.Country || getCountryFromCoords(lat, lng)
+      console.debug('detectCountry result', country)
+      return country
+    } catch (e) {
+      // network/backend not available — fallback to local bbox
+      console.debug('detectCountry backend unavailable, using local fallback', e)
+      return getCountryFromCoords(lat, lng)
+    }
+  }
+
+  const fetchRules = async (country: string) => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || ''
+      const url = `${apiBase}/api/hos/rules/${encodeURIComponent(country)}`
+      console.debug('fetchRules request to', url)
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const data = await res.json()
+      return data
+    } catch (e) {
+      console.error(e)
+      return null
+    }
+  }
+
+  const evaluateHos = async (hosState: HOSState, originCountry: string, currentCountry?: string) => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || ''
+      const url = `${apiBase}/api/hos/evaluate`
+      console.debug('evaluateHos request to', url, { hosState, originCountry, currentCountry })
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hosState, originCountry, currentCountry })
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      return data
+    } catch (e) {
+      console.error(e)
+      return null
+    }
+  }
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -301,22 +373,7 @@ export default function JourneySimulationPage() {
               break
           }
 
-          // Update compliance using active jurisdiction rules
-          const getComplianceStatus = (current: number, limit: number, warningThreshold: number = 0.9) => {
-            if (limit === null || limit === undefined) return 'compliant'
-            if (current >= limit) return 'violation'
-            if (current >= limit * warningThreshold) return 'warning'
-            return 'compliant'
-          }
-
-          const newCompliance: ComplianceStatus = {
-            elevenHourRule: getComplianceStatus(newState.drivingTime, activeRules.maxDrivingMinutes),
-            fourteenHourRule: getComplianceStatus(newState.onDutyTime, activeRules.maxOnDutyMinutes),
-            thirtyMinuteBreak: getComplianceStatus(newState.drivingTime - newState.lastBreakTime, activeRules.breakThresholdMinutes ?? Infinity),
-            seventyHourRule: getComplianceStatus(newState.cycleTime, activeRules.cycleMinutes),
-            journeyCompliance: 'compliant'
-          }
-          setCompliance(newCompliance)
+          // Compliance is handled by backend evaluate endpoint — frontend will request evaluation in a separate effect
 
           return newState
         })
@@ -373,42 +430,40 @@ export default function JourneySimulationPage() {
 
     // Sample the last received position every 10 seconds (reduced for testing)
     gpsIntervalRef.current = setInterval(() => {
-      const p = lastReceivedPositionRef.current
-      if (!p) return
+      (async () => {
+        const p = lastReceivedPositionRef.current
+        if (!p) return
 
-      const posObj = { lat: p.coords.latitude, lng: p.coords.longitude, timestamp: p.timestamp }
-      setJourney(prev => {
-        const detectedCountry = getCountryFromCoords(posObj.lat, posObj.lng)
-        const lastPathCountry = prev.path && prev.path.length ? prev.path[prev.path.length - 1].country : undefined
-        const prevCountry = prev.currentCountry ?? lastPathCountry ?? undefined
+        const posObj = { lat: p.coords.latitude, lng: p.coords.longitude, timestamp: p.timestamp }
 
-        const nowTs = Date.now()
+        const detectedCountry = await detectCountry(posObj.lat, posObj.lng)
 
-        // If crossing detected (previous known country and changed), create an alert and update permit status
-        if (prevCountry && detectedCountry && detectedCountry !== 'Unknown' && detectedCountry !== prevCountry) {
-          // use current time when we persist the update to reflect when UI was updated
-          setBorderAlert(`Crossed into ${detectedCountry} at ${new Date(nowTs).toLocaleString()}`)
-          // mark permit status if crossing into a different country than origin
-          const permitStatus = prev.originCountry !== detectedCountry ? `Entered ${detectedCountry} - permit may be required` : prev.permitStatus
+        setJourney(prev => {
+          const lastPathCountry = prev.path && prev.path.length ? prev.path[prev.path.length - 1].country : undefined
+          const prevCountry = prev.currentCountry ?? lastPathCountry ?? undefined
+          const nowTs = Date.now()
 
-          // persist change and return
+          // If crossing detected (previous known country and changed), create an alert and update permit status
+          if (prevCountry && detectedCountry && detectedCountry !== 'Unknown' && detectedCountry !== prevCountry) {
+            setBorderAlert(`Crossed into ${detectedCountry} at ${new Date(nowTs).toLocaleString()}`)
+            const permitStatus = prev.originCountry !== detectedCountry ? `Entered ${detectedCountry} - permit may be required` : prev.permitStatus
+            return {
+              ...prev,
+              currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: nowTs },
+              currentCountry: detectedCountry,
+              permitStatus,
+              path: [...(prev.path || []), { ...posObj, country: detectedCountry }]
+            }
+          }
+
           return {
             ...prev,
             currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: nowTs },
             currentCountry: detectedCountry,
-            permitStatus,
             path: [...(prev.path || []), { ...posObj, country: detectedCountry }]
           }
-        }
-
-        // Normal update - no crossing
-        return {
-          ...prev,
-          currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: nowTs },
-          currentCountry: detectedCountry,
-          path: [...(prev.path || []), { ...posObj, country: detectedCountry }]
-        }
-      })
+        })
+      })()
     }, 10000)
 
     // Cleanup when effect re-runs or component unmounts
@@ -431,13 +486,42 @@ export default function JourneySimulationPage() {
     }
   }, [journey.status])
 
-  // Update active jurisdiction rules when current country changes
+  // Update active jurisdiction rules when current country or origin changes
   useEffect(() => {
     const country = journey.currentCountry || journey.originCountry
-    if (country && jurisdictionRules[country]) {
-      setActiveRules(jurisdictionRules[country])
-    }
+    if (!country) return
+
+    let mounted = true
+    ;(async () => {
+      const r = await fetchRules(country)
+      if (mounted && r) setActiveRules(normalizeRules(r))
+    })()
+
+    return () => { mounted = false }
   }, [journey.currentCountry, journey.originCountry])
+
+  // Evaluate HOS via backend whenever HOS state or active jurisdiction changes
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      const resp = await evaluateHos(hos, journey.originCountry, journey.currentCountry)
+      if (!mounted || !resp) return
+      if (resp.compliance) {
+        setCompliance({
+          elevenHourRule: resp.compliance.elevenHourRule || resp.compliance.ElevenHourRule || 'compliant',
+          fourteenHourRule: resp.compliance.fourteenHourRule || resp.compliance.FourteenHourRule || 'compliant',
+          thirtyMinuteBreak: resp.compliance.thirtyMinuteBreak || resp.compliance.ThirtyMinuteBreak || 'compliant',
+          seventyHourRule: resp.compliance.seventyHourRule || resp.compliance.SeventyHourRule || 'compliant',
+          journeyCompliance: resp.compliance.journeyCompliance || resp.compliance.JourneyCompliance || 'compliant'
+        })
+      }
+      if (resp.activeRules) {
+        setActiveRules(normalizeRules(resp.activeRules))
+      }
+    })()
+
+    return () => { mounted = false }
+  }, [hos, journey.currentCountry, journey.originCountry])
 
   const formatTime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60)
@@ -507,16 +591,17 @@ export default function JourneySimulationPage() {
     const lat = 64.8378
     const lng = -147.7164
     const timestamp = Date.now()
-    const detectedCountry = getCountryFromCoords(lat, lng)
+    ;(async () => {
+      const detectedCountry = await detectCountry(lat, lng)
+      setJourney(prev => ({
+        ...prev,
+        currentPosition: { lat, lng, accuracy: undefined, speed: undefined, timestamp },
+        currentCountry: detectedCountry,
+        path: [...(prev.path || []), { lat, lng, timestamp, country: detectedCountry }]
+      }))
 
-    setJourney(prev => ({
-      ...prev,
-      currentPosition: { lat, lng, accuracy: undefined, speed: undefined, timestamp },
-      currentCountry: detectedCountry,
-      path: [...(prev.path || []), { lat, lng, timestamp, country: detectedCountry }]
-    }))
-
-    setBorderAlert(`Test: set position to Fairbanks, AK (${detectedCountry})`)
+      setBorderAlert(`Test: set position to Fairbanks, AK (${detectedCountry})`)
+    })()
   }
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -601,7 +686,10 @@ export default function JourneySimulationPage() {
                     onChange={(e) => {
                       const country = e.target.value
                       setJourney(prev => ({ ...prev, originCountry: country, originRegion: '', originCity: '' }))
-                      if (jurisdictionRules[country]) setActiveRules(jurisdictionRules[country])
+                      ;(async () => {
+                        const r = await fetchRules(country)
+                        if (r) setActiveRules(normalizeRules(r))
+                      })()
                     }}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
                     disabled={journey.status !== 'planned'}
