@@ -25,7 +25,8 @@ interface JourneyState {
   permitStatus?: string
   // Real GPS tracking (no map API)
   currentPosition?: { lat: number; lng: number; accuracy?: number; speed?: number; timestamp?: number }
-  path?: { lat: number; lng: number; timestamp?: number }[]
+  currentCountry?: string
+  path?: { lat: number; lng: number; timestamp?: number; country?: string }[]
 }
 
 interface HOSState {
@@ -186,6 +187,18 @@ export default function JourneySimulationPage() {
   const geoWatchIdRef = useRef<number | null>(null)
   const lastReceivedPositionRef = useRef<GeolocationPosition | null>(null)
   const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [borderAlert, setBorderAlert] = useState<string | null>(null)
+
+  // Rough country bounding boxes for detection (US / Canada / Mexico)
+  const getCountryFromCoords = (lat: number, lng: number): string => {
+    // Canada bbox (approx)
+    if (lat >= 42 && lat <= 83 && lng >= -141 && lng <= -52) return 'Canada'
+    // United States bbox (approx, excludes territories)
+    if (lat >= 24.5 && lat <= 49.5 && lng >= -125 && lng <= -66) return 'United States'
+    // Mexico bbox (approx)
+    if (lat >= 14.5 && lat <= 32.7 && lng >= -118.5 && lng <= -86.7) return 'Mexico'
+    return 'Unknown'
+  }
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -341,18 +354,45 @@ export default function JourneySimulationPage() {
     // store numeric id
     geoWatchIdRef.current = watchId as unknown as number
 
-    // Sample the last received position once per minute (business rule)
+    // Sample the last received position every 10 seconds (reduced for testing)
     gpsIntervalRef.current = setInterval(() => {
       const p = lastReceivedPositionRef.current
       if (!p) return
 
       const posObj = { lat: p.coords.latitude, lng: p.coords.longitude, timestamp: p.timestamp }
-      setJourney(prev => ({
-        ...prev,
-        currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: posObj.timestamp },
-        path: [...(prev.path || []), posObj]
-      }))
-    }, 60000)
+      setJourney(prev => {
+        const detectedCountry = getCountryFromCoords(posObj.lat, posObj.lng)
+        const lastPathCountry = prev.path && prev.path.length ? prev.path[prev.path.length - 1].country : undefined
+        const prevCountry = prev.currentCountry ?? lastPathCountry ?? undefined
+
+        const nowTs = Date.now()
+
+        // If crossing detected (previous known country and changed), create an alert and update permit status
+        if (prevCountry && detectedCountry && detectedCountry !== 'Unknown' && detectedCountry !== prevCountry) {
+          // use current time when we persist the update to reflect when UI was updated
+          setBorderAlert(`Crossed into ${detectedCountry} at ${new Date(nowTs).toLocaleString()}`)
+          // mark permit status if crossing into a different country than origin
+          const permitStatus = prev.originCountry !== detectedCountry ? `Entered ${detectedCountry} - permit may be required` : prev.permitStatus
+
+          // persist change and return
+          return {
+            ...prev,
+            currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: nowTs },
+            currentCountry: detectedCountry,
+            permitStatus,
+            path: [...(prev.path || []), { ...posObj, country: detectedCountry }]
+          }
+        }
+
+        // Normal update - no crossing
+        return {
+          ...prev,
+          currentPosition: { lat: posObj.lat, lng: posObj.lng, accuracy: p.coords.accuracy, speed: p.coords.speed ?? undefined, timestamp: nowTs },
+          currentCountry: detectedCountry,
+          path: [...(prev.path || []), { ...posObj, country: detectedCountry }]
+        }
+      })
+    }, 10000)
 
     // Cleanup when effect re-runs or component unmounts
     return () => {
@@ -369,6 +409,8 @@ export default function JourneySimulationPage() {
         clearInterval(gpsIntervalRef.current)
         gpsIntervalRef.current = null
       }
+      // clear border alert after stopping tracking
+      setBorderAlert(null)
     }
   }, [journey.status])
 
@@ -433,6 +475,23 @@ export default function JourneySimulationPage() {
       currentActivity: 'off-duty',
       lastBreakTime: prev.drivingTime
     }))
+  }
+
+  // Inject test coordinates (Fairbanks, AK) for testing country detection
+  const injectTestCoordinatesFairbanks = () => {
+    const lat = 64.8378
+    const lng = -147.7164
+    const timestamp = Date.now()
+    const detectedCountry = getCountryFromCoords(lat, lng)
+
+    setJourney(prev => ({
+      ...prev,
+      currentPosition: { lat, lng, accuracy: undefined, speed: undefined, timestamp },
+      currentCountry: detectedCountry,
+      path: [...(prev.path || []), { lat, lng, timestamp, country: detectedCountry }]
+    }))
+
+    setBorderAlert(`Test: set position to Fairbanks, AK (${detectedCountry})`)
   }
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -530,9 +589,23 @@ export default function JourneySimulationPage() {
                   <div className="bg-gray-50 p-3 rounded-md">
                     <p className="text-sm text-gray-600">Latitude: {journey.currentPosition.lat.toFixed(6)}</p>
                     <p className="text-sm text-gray-600">Longitude: {journey.currentPosition.lng.toFixed(6)}</p>
+                    <p className="text-sm text-gray-600">Country: {journey.currentCountry || 'N/A'}</p>
                     <p className="text-sm text-gray-600">Accuracy: {journey.currentPosition.accuracy ? `${journey.currentPosition.accuracy.toFixed(1)} m` : 'N/A'}</p>
                     <p className="text-sm text-gray-600">Speed: {journey.currentPosition.speed ? `${journey.currentPosition.speed.toFixed(1)} m/s` : 'N/A'}</p>
                     <p className="text-sm text-gray-600">Samples: {journey.path?.length || 0}</p>
+                    {borderAlert && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-sm text-yellow-800">{borderAlert}</p>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <button
+                        onClick={injectTestCoordinatesFairbanks}
+                        className="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+                      >
+                        Set Test Start: Fairbanks, AK
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-gray-50 p-3 rounded-md text-sm text-gray-600">Waiting for GPS fix or permission...</div>
