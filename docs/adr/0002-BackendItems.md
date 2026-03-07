@@ -1,0 +1,1 @@
+While using Copilot to build the frontend, I realized the frontend is a security risk for private information, such as violations. I am now having the AI move the necessary lines of code out of the frontend, and reformat them for the backend

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Truck, Fuel, Clock, MapPin } from 'lucide-react'
+import { Truck, Fuel, Clock, MapPin, TestTube, Compass } from 'lucide-react'
 
 interface TruckStats {
   distanceToday: number
@@ -144,6 +144,40 @@ export default function Dashboard() {
               <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
               <span className="text-sm text-gray-700">Break Required Soon</span>
             </div>
+          </div>
+        </div>
+
+        {/* Navigation to Testing */}
+        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">USMCA Compliance Testing</h2>
+              <p className="text-gray-600 mt-1">Test Hours of Service rules and scenarios</p>
+            </div>
+            <a
+              href="/testing"
+              className="flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+            >
+              <TestTube className="h-4 w-4 mr-2" />
+              Open Testing Lab
+            </a>
+          </div>
+        </div>
+
+        {/* Navigation to Journey Simulation */}
+        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Journey Simulation</h2>
+              <p className="text-gray-600 mt-1">Complete USMCA-compliant journey simulation</p>
+            </div>
+            <a
+              href="/journey-simulation"
+              className="flex items-center px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
+            >
+              <Compass className="h-4 w-4 mr-2" />
+              Start Journey Simulation
+            </a>
           </div>
         </div>
       </div>
