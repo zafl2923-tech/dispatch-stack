@@ -1,4 +1,4 @@
-namespace DispatchStack.Api.Models
+namespace DispatchStack.Api.Models.DTOs
 {
     public class RulesDto
     {
