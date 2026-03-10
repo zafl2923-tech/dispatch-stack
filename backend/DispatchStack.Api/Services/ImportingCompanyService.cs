@@ -1,4 +1,6 @@
+using DispatchStack.Api.Data;
 using DispatchStack.Api.Models.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace DispatchStack.Api.Services
 {
@@ -13,99 +15,66 @@ namespace DispatchStack.Api.Services
 
     public class ImportingCompanyService : IImportingCompanyService
     {
-        private readonly List<ImportingCompany> _companies = new();
-        private readonly SemaphoreSlim _lock = new(1, 1);
+        private readonly DispatchStackDbContext _context;
+
+        public ImportingCompanyService(DispatchStackDbContext context)
+        {
+            _context = context;
+        }
 
         public async Task<IEnumerable<ImportingCompany>> GetAllAsync()
         {
-            await _lock.WaitAsync();
-            try
-            {
-                return _companies.ToList();
-            }
-            finally
-            {
-                _lock.Release();
-            }
+            return await _context.ImportingCompanies.ToListAsync();
         }
 
         public async Task<ImportingCompany?> GetByIdAsync(Guid id)
         {
-            await _lock.WaitAsync();
-            try
-            {
-                return _companies.FirstOrDefault(c => c.Id == id);
-            }
-            finally
-            {
-                _lock.Release();
-            }
+            return await _context.ImportingCompanies.FindAsync(id);
         }
 
         public async Task<ImportingCompany> CreateAsync(ImportingCompany company)
         {
-            await _lock.WaitAsync();
-            try
-            {
-                company.Id = Guid.NewGuid();
-                company.CreatedAt = DateTime.UtcNow;
-                company.UpdatedAt = DateTime.UtcNow;
-                _companies.Add(company);
-                return company;
-            }
-            finally
-            {
-                _lock.Release();
-            }
+            company.Id = Guid.NewGuid();
+            company.CreatedAt = DateTime.UtcNow;
+            company.UpdatedAt = DateTime.UtcNow;
+            _context.ImportingCompanies.Add(company);
+            await _context.SaveChangesAsync();
+            return company;
         }
 
         public async Task<ImportingCompany?> UpdateAsync(Guid id, ImportingCompany company)
         {
-            await _lock.WaitAsync();
-            try
-            {
-                var existing = _companies.FirstOrDefault(c => c.Id == id);
-                if (existing == null) return null;
+            var existing = await _context.ImportingCompanies.FindAsync(id);
+            if (existing == null) return null;
 
-                existing.CompanyName = company.CompanyName;
-                existing.BusinessNumber = company.BusinessNumber;
-                existing.TaxId = company.TaxId;
-                existing.Address = company.Address;
-                existing.City = company.City;
-                existing.Region = company.Region;
-                existing.Country = company.Country;
-                existing.PostalCode = company.PostalCode;
-                existing.ContactName = company.ContactName;
-                existing.ContactEmail = company.ContactEmail;
-                existing.ContactPhone = company.ContactPhone;
-                existing.ImportLicenseNumber = company.ImportLicenseNumber;
-                existing.ImportLicenseExpiryDate = company.ImportLicenseExpiryDate;
-                existing.USMCAStatus = company.USMCAStatus;
-                existing.UpdatedAt = DateTime.UtcNow;
+            existing.CompanyName = company.CompanyName;
+            existing.BusinessNumber = company.BusinessNumber;
+            existing.TaxId = company.TaxId;
+            existing.Address = company.Address;
+            existing.City = company.City;
+            existing.Region = company.Region;
+            existing.Country = company.Country;
+            existing.PostalCode = company.PostalCode;
+            existing.ContactName = company.ContactName;
+            existing.ContactEmail = company.ContactEmail;
+            existing.ContactPhone = company.ContactPhone;
+            existing.ImportLicenseNumber = company.ImportLicenseNumber;
+            existing.ImportLicenseExpiryDate = company.ImportLicenseExpiryDate;
+            existing.USMCAStatus = company.USMCAStatus;
+            existing.UpdatedAt = DateTime.UtcNow;
 
-                return existing;
-            }
-            finally
-            {
-                _lock.Release();
-            }
+            await _context.SaveChangesAsync();
+            return existing;
         }
 
         public async Task<bool> DeleteAsync(Guid id)
         {
-            await _lock.WaitAsync();
-            try
-            {
-                var company = _companies.FirstOrDefault(c => c.Id == id);
-                if (company == null) return false;
+            var company = await _context.ImportingCompanies.FindAsync(id);
+            if (company == null) return false;
 
-                _companies.Remove(company);
-                return true;
-            }
-            finally
-            {
-                _lock.Release();
-            }
+            _context.ImportingCompanies.Remove(company);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

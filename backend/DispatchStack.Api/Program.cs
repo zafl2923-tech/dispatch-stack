@@ -1,5 +1,7 @@
+using DispatchStack.Api.Data;
 using DispatchStack.Api.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Text.Json;
@@ -21,10 +23,16 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddSingleton<IDriverService, DriverService>();
-builder.Services.AddSingleton<ITruckService, TruckService>();
-builder.Services.AddSingleton<IExportingCompanyService, ExportingCompanyService>();
-builder.Services.AddSingleton<IImportingCompanyService, ImportingCompanyService>();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Host=localhost;Database=dispatchstack;Username=postgres;Password=postgres";
+
+builder.Services.AddDbContext<DispatchStackDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<IDriverService, DriverService>();
+builder.Services.AddScoped<ITruckService, TruckService>();
+builder.Services.AddScoped<IExportingCompanyService, ExportingCompanyService>();
+builder.Services.AddScoped<IImportingCompanyService, ImportingCompanyService>();
 
 var app = builder.Build();
 
