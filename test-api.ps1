@@ -98,10 +98,11 @@ try {
 }
 Write-Host ""
 
-# Test 5: Create a test exporting company
-Write-Host "5️⃣ Creating test exporting company..." -ForegroundColor Yellow
-$testExporter = @{
+# Test 5: Create a test company (Exporter)
+Write-Host "5️⃣ Creating test company (Exporter)..." -ForegroundColor Yellow
+$testCompany = @{
     companyName = "Test Exports Inc"
+    companyType = "Exporter"
     businessNumber = "BN$(Get-Random -Minimum 100000 -Maximum 999999)"
     taxId = "TAX$(Get-Random -Minimum 100000 -Maximum 999999)"
     address = "456 Export Blvd"
@@ -118,18 +119,18 @@ $testExporter = @{
 } | ConvertTo-Json
 
 try {
-    $response = Invoke-WebRequest -Uri "$baseUrl/exportingcompanies" -Method Post -Body $testExporter -ContentType "application/json" -TimeoutSec 5
-    Write-Host "✅ Exporting company created successfully" -ForegroundColor Green
+    $response = Invoke-WebRequest -Uri "$baseUrl/companies" -Method Post -Body $testCompany -ContentType "application/json" -TimeoutSec 5
+    Write-Host "✅ Company created successfully" -ForegroundColor Green
     $company = $response.Content | ConvertFrom-Json
-    Write-Host "   Company: $($company.companyName)" -ForegroundColor Gray
+    Write-Host "   Company: $($company.companyName) ($($company.companyType))" -ForegroundColor Gray
 } catch {
-    Write-Host "❌ Failed to create exporting company: $_" -ForegroundColor Red
+    Write-Host "❌ Failed to create company: $_" -ForegroundColor Red
 }
 Write-Host ""
 
 # Test 6: Get all entities
 Write-Host "6️⃣ Retrieving all entities..." -ForegroundColor Yellow
-$entities = @("drivers", "trucks", "exportingcompanies", "importingcompanies")
+$entities = @("drivers", "trucks", "companies")
 foreach ($entity in $entities) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/$entity" -Method Get -TimeoutSec 5

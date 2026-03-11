@@ -31,8 +31,7 @@ builder.Services.AddDbContext<DispatchStackDbContext>(options =>
 
 builder.Services.AddScoped<IDriverService, DriverService>();
 builder.Services.AddScoped<ITruckService, TruckService>();
-builder.Services.AddScoped<IExportingCompanyService, ExportingCompanyService>();
-builder.Services.AddScoped<IImportingCompanyService, ImportingCompanyService>();
+builder.Services.AddScoped<ICompanyService, CompanyService>();
 
 var app = builder.Build();
 

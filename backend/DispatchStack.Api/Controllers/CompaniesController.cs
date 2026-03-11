@@ -7,25 +7,35 @@ namespace DispatchStack.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class ExportingCompaniesController : ControllerBase
+    public class CompaniesController : ControllerBase
     {
-        private readonly IExportingCompanyService _companyService;
+        private readonly ICompanyService _companyService;
 
-        public ExportingCompaniesController(IExportingCompanyService companyService)
+        public CompaniesController(ICompanyService companyService)
         {
             _companyService = companyService;
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ExportingCompanyDto>>> GetAll()
+        public async Task<ActionResult<IEnumerable<CompanyDto>>> GetAll([FromQuery] string? type = null)
         {
-            var companies = await _companyService.GetAllAsync();
+            IEnumerable<Company> companies;
+            
+            if (!string.IsNullOrEmpty(type))
+            {
+                companies = await _companyService.GetByTypeAsync(type);
+            }
+            else
+            {
+                companies = await _companyService.GetAllAsync();
+            }
+            
             var dtos = companies.Select(MapToDto);
             return Ok(dtos);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<ExportingCompanyDto>> GetById(Guid id)
+        public async Task<ActionResult<CompanyDto>> GetById(Guid id)
         {
             var company = await _companyService.GetByIdAsync(id);
             if (company == null) return NotFound();
@@ -33,7 +43,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<ExportingCompanyDto>> Create([FromBody] ExportingCompanyDto dto)
+        public async Task<ActionResult<CompanyDto>> Create([FromBody] CompanyDto dto)
         {
             var company = MapToEntity(dto);
             var created = await _companyService.CreateAsync(company);
@@ -41,7 +51,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<ExportingCompanyDto>> Update(Guid id, [FromBody] ExportingCompanyDto dto)
+        public async Task<ActionResult<CompanyDto>> Update(Guid id, [FromBody] CompanyDto dto)
         {
             var company = MapToEntity(dto);
             var updated = await _companyService.UpdateAsync(id, company);
@@ -57,12 +67,13 @@ namespace DispatchStack.Api.Controllers
             return NoContent();
         }
 
-        private static ExportingCompanyDto MapToDto(ExportingCompany company)
+        private static CompanyDto MapToDto(Company company)
         {
-            return new ExportingCompanyDto
+            return new CompanyDto
             {
                 Id = company.Id,
                 CompanyName = company.CompanyName,
+                CompanyType = company.CompanyType,
                 BusinessNumber = company.BusinessNumber,
                 TaxId = company.TaxId,
                 Address = company.Address,
@@ -75,15 +86,18 @@ namespace DispatchStack.Api.Controllers
                 ContactPhone = company.ContactPhone,
                 ExportLicenseNumber = company.ExportLicenseNumber,
                 ExportLicenseExpiryDate = company.ExportLicenseExpiryDate,
+                ImportLicenseNumber = company.ImportLicenseNumber,
+                ImportLicenseExpiryDate = company.ImportLicenseExpiryDate,
                 USMCAStatus = company.USMCAStatus
             };
         }
 
-        private static ExportingCompany MapToEntity(ExportingCompanyDto dto)
+        private static Company MapToEntity(CompanyDto dto)
         {
-            return new ExportingCompany
+            return new Company
             {
                 CompanyName = dto.CompanyName,
+                CompanyType = dto.CompanyType,
                 BusinessNumber = dto.BusinessNumber,
                 TaxId = dto.TaxId,
                 Address = dto.Address,
@@ -96,6 +110,8 @@ namespace DispatchStack.Api.Controllers
                 ContactPhone = dto.ContactPhone,
                 ExportLicenseNumber = dto.ExportLicenseNumber,
                 ExportLicenseExpiryDate = dto.ExportLicenseExpiryDate,
+                ImportLicenseNumber = dto.ImportLicenseNumber,
+                ImportLicenseExpiryDate = dto.ImportLicenseExpiryDate,
                 USMCAStatus = dto.USMCAStatus
             };
         }

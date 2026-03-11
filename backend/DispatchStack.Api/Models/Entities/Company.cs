@@ -1,9 +1,10 @@
 namespace DispatchStack.Api.Models.Entities
 {
-    public class ImportingCompany
+    public class Company
     {
         public Guid Id { get; set; }
         public string CompanyName { get; set; } = string.Empty;
+        public string CompanyType { get; set; } = string.Empty; // "Exporter", "Importer", "Both"
         public string BusinessNumber { get; set; } = string.Empty;
         public string TaxId { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
@@ -14,7 +15,9 @@ namespace DispatchStack.Api.Models.Entities
         public string ContactName { get; set; } = string.Empty;
         public string ContactEmail { get; set; } = string.Empty;
         public string ContactPhone { get; set; } = string.Empty;
-        public string ImportLicenseNumber { get; set; } = string.Empty;
+        public string? ExportLicenseNumber { get; set; }
+        public DateTime? ExportLicenseExpiryDate { get; set; }
+        public string? ImportLicenseNumber { get; set; }
         public DateTime? ImportLicenseExpiryDate { get; set; }
         public string USMCAStatus { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
