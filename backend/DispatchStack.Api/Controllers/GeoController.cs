@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using DispatchStack.Api.Models;
+using DispatchStack.Api.Models.DTOs;
 
 namespace DispatchStack.Api.Controllers
 {

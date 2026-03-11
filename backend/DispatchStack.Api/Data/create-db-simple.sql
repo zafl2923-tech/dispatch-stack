@@ -1,0 +1,35 @@
+-- =============================================================================
+-- DispatchStack - Simple Database Creation for pgAdmin 4
+-- =============================================================================
+-- 
+-- ⚠️ IMPORTANT: This script is for REFERENCE ONLY
+-- 
+-- RECOMMENDED: Use EF Core migrations instead (they handle everything automatically):
+--   cd backend/DispatchStack.Api
+--   dotnet ef migrations add InitialCreate
+--   dotnet ef database update
+--
+-- EF Core will create the database AND tables automatically - no SQL scripts needed!
+--
+-- =============================================================================
+-- Only use this script if you need to create the database manually first:
+-- =============================================================================
+--
+-- INSTRUCTIONS (if not using EF Core):
+-- 1. Open pgAdmin 4
+-- 2. Right-click "postgres" database → "Query Tool"
+-- 3. Run ONLY the CREATE DATABASE line below
+-- 4. If you get "database already exists" error, that's fine!
+-- 5. Then use EF Core migrations to create tables
+--
+-- =============================================================================
+
+CREATE DATABASE dispatchstack WITH ENCODING = 'UTF8' TEMPLATE = template0;
+
+-- That's it! If successful, you'll see: "CREATE DATABASE"
+-- If you get an error "database already exists", that's okay.
+--
+-- Next steps:
+-- - Run: dotnet ef migrations add InitialCreate
+-- - Run: dotnet ef database update
+-- - This creates all tables automatically!
