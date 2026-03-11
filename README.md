@@ -36,7 +36,13 @@ The "Brain" of DispatchStack automatically swaps validation rules as drivers cro
 
 ## :rocket: Development Status
 * **Current Focus:** Architecting the `JurisdictionStrategy` in C# to handle the 2026 Mexico NOM-087 break requirements.
-* **Database:** PostgreSQL schema initialized with `DutyStatusLog` and `Jurisdiction` tracking.
+* **Database:** PostgreSQL schema initialized with `Drivers`, `Trucks`, and `Companies` tables.
 * **Frontend:** Next.js dashboard scaffolded with real-time "Time Remaining" countdowns.
+
+---
+
+## 📚 Documentation
+
+- **[DATABASE_GUIDE.md](DATABASE_GUIDE.md)** - Complete database setup, testing, and management guide
 
 ---

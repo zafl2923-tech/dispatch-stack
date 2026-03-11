@@ -1,9 +1,10 @@
 namespace DispatchStack.Api.Models.DTOs
 {
-    public class ImportingCompanyDto
+    public class CompanyDto
     {
         public Guid? Id { get; set; }
         public string CompanyName { get; set; } = string.Empty;
+        public string CompanyType { get; set; } = string.Empty; // "Exporter", "Importer", "Both"
         public string BusinessNumber { get; set; } = string.Empty;
         public string TaxId { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
@@ -14,7 +15,9 @@ namespace DispatchStack.Api.Models.DTOs
         public string ContactName { get; set; } = string.Empty;
         public string ContactEmail { get; set; } = string.Empty;
         public string ContactPhone { get; set; } = string.Empty;
-        public string ImportLicenseNumber { get; set; } = string.Empty;
+        public string? ExportLicenseNumber { get; set; }
+        public DateTime? ExportLicenseExpiryDate { get; set; }
+        public string? ImportLicenseNumber { get; set; }
         public DateTime? ImportLicenseExpiryDate { get; set; }
         public string USMCAStatus { get; set; } = string.Empty;
     }
