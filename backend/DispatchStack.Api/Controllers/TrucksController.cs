@@ -1,12 +1,14 @@
 using DispatchStack.Api.Models.DTOs;
 using DispatchStack.Api.Models.Entities;
 using DispatchStack.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DispatchStack.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // All endpoints require authentication
     public class TrucksController : ControllerBase
     {
         private readonly ITruckService _truckService;
@@ -33,6 +35,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can create trucks
         public async Task<ActionResult<TruckDto>> Create([FromBody] TruckDto dto)
         {
             var truck = MapToEntity(dto);
@@ -41,6 +44,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can update trucks
         public async Task<ActionResult<TruckDto>> Update(Guid id, [FromBody] TruckDto dto)
         {
             var truck = MapToEntity(dto);
@@ -50,6 +54,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can delete trucks
         public async Task<ActionResult> Delete(Guid id)
         {
             var deleted = await _truckService.DeleteAsync(id);

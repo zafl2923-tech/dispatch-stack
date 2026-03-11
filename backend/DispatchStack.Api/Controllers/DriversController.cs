@@ -1,12 +1,15 @@
 using DispatchStack.Api.Models.DTOs;
 using DispatchStack.Api.Models.Entities;
 using DispatchStack.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DispatchStack.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // All endpoints require authentication
     public class DriversController : ControllerBase
     {
         private readonly IDriverService _driverService;
@@ -17,6 +20,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can list all drivers
         public async Task<ActionResult<IEnumerable<DriverDto>>> GetAll()
         {
             var drivers = await _driverService.GetAllAsync();
@@ -27,12 +31,24 @@ namespace DispatchStack.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<DriverDto>> GetById(Guid id)
         {
+            // Truckers can only access their own driver record
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            if (role == "Trucker")
+            {
+                var driverIdClaim = User.FindFirst("DriverId")?.Value;
+                if (string.IsNullOrEmpty(driverIdClaim) || driverIdClaim != id.ToString())
+                {
+                    return Forbid(); // Trucker trying to access someone else's data
+                }
+            }
+
             var driver = await _driverService.GetByIdAsync(id);
             if (driver == null) return NotFound();
             return Ok(MapToDto(driver));
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can create drivers
         public async Task<ActionResult<DriverDto>> Create([FromBody] DriverDto dto)
         {
             var driver = MapToEntity(dto);
@@ -41,6 +57,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can update drivers
         public async Task<ActionResult<DriverDto>> Update(Guid id, [FromBody] DriverDto dto)
         {
             var driver = MapToEntity(dto);
@@ -50,6 +67,7 @@ namespace DispatchStack.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin,Dispatcher")] // Only Admin and Dispatcher can delete drivers
         public async Task<ActionResult> Delete(Guid id)
         {
             var deleted = await _driverService.DeleteAsync(id);

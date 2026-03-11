@@ -22,5 +22,8 @@ namespace DispatchStack.Api.Models.Entities
         public string USMCAStatus { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        // Navigation property - link to user account if company has login access
+        public User? User { get; set; }
     }
 }

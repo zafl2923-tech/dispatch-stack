@@ -43,6 +43,19 @@ The "Brain" of DispatchStack automatically swaps validation rules as drivers cro
 
 ## 📚 Documentation
 
+### Setup & Configuration
 - **[DATABASE_GUIDE.md](DATABASE_GUIDE.md)** - Complete database setup, testing, and management guide
+- **[USER_ACCOUNTS_GUIDE.md](USER_ACCOUNTS_GUIDE.md)** - Authentication system and user account management
+- **[AUTH_QUICK_REFERENCE.md](AUTH_QUICK_REFERENCE.md)** - Quick reference for authentication commands
+- **[FRONTEND_LOGIN_GUIDE.md](FRONTEND_LOGIN_GUIDE.md)** - Frontend login system setup and usage
+
+### Architecture & Implementation
+- **[AUTHENTICATION_IMPLEMENTATION.md](AUTHENTICATION_IMPLEMENTATION.md)** - Technical implementation details of the auth system
+- **[FRONTEND_IMPLEMENTATION_SUMMARY.md](FRONTEND_IMPLEMENTATION_SUMMARY.md)** - Frontend authentication implementation summary
+- **[COMPANY_ACCOUNTS_IMPLEMENTATION.md](COMPANY_ACCOUNTS_IMPLEMENTATION.md)** - Company accounts technical implementation
+- **[COMPANY_ACCOUNTS_COMPLETE_GUIDE.md](COMPANY_ACCOUNTS_COMPLETE_GUIDE.md)** - Complete guide for company user accounts
+
+### Security
+- **[FRONTEND_SECURITY.md](FRONTEND_SECURITY.md)** - Comprehensive frontend security documentation
 
 ---

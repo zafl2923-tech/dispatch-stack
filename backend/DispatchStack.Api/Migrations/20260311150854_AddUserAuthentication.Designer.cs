@@ -3,6 +3,7 @@ using System;
 using DispatchStack.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DispatchStack.Api.Migrations
 {
     [DbContext(typeof(DispatchStackDbContext))]
-    partial class DispatchStackDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260311150854_AddUserAuthentication")]
+    partial class AddUserAuthentication
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -216,112 +219,6 @@ namespace DispatchStack.Api.Migrations
                     b.ToTable("Drivers");
                 });
 
-            modelBuilder.Entity("DispatchStack.Api.Models.Entities.Shipment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ActualDeliveryTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CargoDescription")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CargoType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("CargoWeight")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<double?>("CurrentLatitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<double?>("CurrentLongitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("DestinationAddress")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DestinationCity")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DestinationCountry")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DestinationRegion")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("DriverId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("EstimatedDeliveryTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastLocationUpdate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("OriginAddress")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("OriginCity")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("OriginCountry")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("OriginRegion")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("PickupTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ReceivingCompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ShipmentNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ShippingCompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("TruckId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DriverId");
-
-                    b.HasIndex("ReceivingCompanyId");
-
-                    b.HasIndex("ShippingCompanyId");
-
-                    b.HasIndex("TruckId");
-
-                    b.ToTable("Shipments");
-                });
-
             modelBuilder.Entity("DispatchStack.Api.Models.Entities.Truck", b =>
                 {
                     b.Property<Guid>("Id")
@@ -417,9 +314,6 @@ namespace DispatchStack.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -453,9 +347,6 @@ namespace DispatchStack.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompanyId")
-                        .IsUnique();
-
                     b.HasIndex("DriverId")
                         .IsUnique();
 
@@ -470,61 +361,14 @@ namespace DispatchStack.Api.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("DispatchStack.Api.Models.Entities.Shipment", b =>
-                {
-                    b.HasOne("DispatchStack.Api.Models.Entities.Driver", "Driver")
-                        .WithMany()
-                        .HasForeignKey("DriverId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DispatchStack.Api.Models.Entities.Company", "ReceivingCompany")
-                        .WithMany()
-                        .HasForeignKey("ReceivingCompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DispatchStack.Api.Models.Entities.Company", "ShippingCompany")
-                        .WithMany()
-                        .HasForeignKey("ShippingCompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DispatchStack.Api.Models.Entities.Truck", "Truck")
-                        .WithMany()
-                        .HasForeignKey("TruckId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Driver");
-
-                    b.Navigation("ReceivingCompany");
-
-                    b.Navigation("ShippingCompany");
-
-                    b.Navigation("Truck");
-                });
-
             modelBuilder.Entity("DispatchStack.Api.Models.Entities.User", b =>
                 {
-                    b.HasOne("DispatchStack.Api.Models.Entities.Company", "Company")
-                        .WithOne("User")
-                        .HasForeignKey("DispatchStack.Api.Models.Entities.User", "CompanyId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("DispatchStack.Api.Models.Entities.Driver", "Driver")
                         .WithOne("User")
                         .HasForeignKey("DispatchStack.Api.Models.Entities.User", "DriverId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Company");
-
                     b.Navigation("Driver");
-                });
-
-            modelBuilder.Entity("DispatchStack.Api.Models.Entities.Company", b =>
-                {
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DispatchStack.Api.Models.Entities.Driver", b =>

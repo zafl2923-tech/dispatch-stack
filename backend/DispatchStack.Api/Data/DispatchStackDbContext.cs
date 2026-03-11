@@ -13,6 +13,8 @@ namespace DispatchStack.Api.Data
         public DbSet<Driver> Drivers { get; set; }
         public DbSet<Truck> Trucks { get; set; }
         public DbSet<Company> Companies { get; set; }
+        public DbSet<User> Users { get; set; }
+        public DbSet<Shipment> Shipments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -35,6 +37,12 @@ namespace DispatchStack.Api.Data
                 entity.Property(e => e.PostalCode).HasMaxLength(20);
                 entity.Property(e => e.EmploymentStatus).HasMaxLength(50);
                 entity.HasIndex(e => e.LicenseNumber).IsUnique();
+
+                // One-to-one relationship with User
+                entity.HasOne(e => e.User)
+                    .WithOne(u => u.Driver)
+                    .HasForeignKey<User>(u => u.DriverId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<Truck>(entity =>
@@ -73,6 +81,25 @@ namespace DispatchStack.Api.Data
                 entity.Property(e => e.USMCAStatus).HasMaxLength(50);
                 entity.HasIndex(e => e.CompanyType);
                 entity.HasIndex(e => e.Country);
+
+                // One-to-one relationship with User
+                entity.HasOne(e => e.User)
+                    .WithOne(u => u.Company)
+                    .HasForeignKey<User>(u => u.CompanyId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Username).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.PasswordHash).IsRequired();
+                entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.IsActive).IsRequired();
+                entity.HasIndex(e => e.Username).IsUnique();
+                entity.HasIndex(e => e.Email).IsUnique();
+                entity.HasIndex(e => e.Role);
             });
         }
     }

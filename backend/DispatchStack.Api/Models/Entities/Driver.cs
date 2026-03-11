@@ -21,5 +21,8 @@ namespace DispatchStack.Api.Models.Entities
         public DateTime HireDate { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        // Navigation property - link to user account if driver has login access
+        public User? User { get; set; }
     }
 }
